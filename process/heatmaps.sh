@@ -29,11 +29,11 @@ for m in i5 xeon; do
 
 		for fp in 'omit-frame-pointer' 'no-omit-frame-pointer'; do
 
-			psql -t -A -F ' ' $DBNAME > gcc-load-$march-$fp.data <<EOF
+			psql -t -A -F ',' $DBNAME > gcc-load-$march-$fp.data <<EOF
 SELECT "O0", "O1", "O2", "O3", "Ofast", "Og", "Os" FROM crosstab('SELECT
   lpad(version, 10) AS row_name,
   optimization as category,
-  duration::int::text as value
+  COALESCE(duration::int::text, ''0'') as value
  FROM gcc_load_results_agg
 WHERE machine = ''$m'' AND march = ''$march'' AND fp = ''$fp''
 ORDER BY 1, 2',
@@ -41,11 +41,11 @@ ORDER BY 1, 2',
 ) AS ct(category text, "O0" text, "O1" text, "O2" text, "O3" text, "Ofast" text, "Og" text, "Os" text)
 EOF
 
-			psql -t -A -F ' ' $DBNAME > gcc-queries-min-$march-$fp.data <<EOF
+			psql -t -A -F ',' $DBNAME > gcc-queries-min-$march-$fp.data <<EOF
 SELECT "O0", "O1", "O2", "O3", "Ofast", "Og", "Os" FROM crosstab('SELECT
   lpad(version, 10) AS row_name,
   optimization as category,
-  duration_min::int::text as value
+  COALESCE(duration_min::int::text, ''0'') as value
  FROM gcc_total_query_results_agg
 WHERE machine = ''$m'' AND march = ''$march'' AND fp = ''$fp''
 ORDER BY 1, 2',
@@ -53,11 +53,11 @@ ORDER BY 1, 2',
 ) AS ct(category text, "O0" text, "O1" text, "O2" text, "O3" text, "Ofast" text, "Og" text, "Os" text)
 EOF
 
-			psql -t -A -F ' ' $DBNAME > gcc-queries-max-$march-$fp.data <<EOF
+			psql -t -A -F ',' $DBNAME > gcc-queries-max-$march-$fp.data <<EOF
 SELECT "O0", "O1", "O2", "O3", "Ofast", "Og", "Os" FROM crosstab('SELECT
   lpad(version, 10) AS row_name,
   optimization as category,
-  duration_max::int::text as value
+  COALESCE(duration_max::int::text, ''0'') as value
  FROM gcc_total_query_results_agg
 WHERE machine = ''$m'' AND march = ''$march'' AND fp = ''$fp''
 ORDER BY 1, 2',
@@ -65,11 +65,11 @@ ORDER BY 1, 2',
 ) AS ct(category text, "O0" text, "O1" text, "O2" text, "O3" text, "Ofast" text, "Og" text, "Os" text)
 EOF
 
-			psql -t -A -F ' ' $DBNAME > gcc-queries-avg-$march-$fp.data <<EOF
+			psql -t -A -F ',' $DBNAME > gcc-queries-avg-$march-$fp.data <<EOF
 SELECT "O0", "O1", "O2", "O3", "Ofast", "Og", "Os" FROM crosstab('SELECT
   lpad(version, 10) AS row_name,
   optimization as category,
-  duration_avg::int::text as value
+  COALESCE(duration_avg::int::text, ''0'') as value
  FROM gcc_total_query_results_agg
 WHERE machine = ''$m'' AND march = ''$march'' AND fp = ''$fp''
 ORDER BY 1, 2',
@@ -81,8 +81,21 @@ EOF
 
 	done
 
+	xtics=`psql $DBNAME -t -A -c "SELECT string_agg(optimization, ' ') FROM (SELECT DISTINCT optimization FROM gcc_total_query_results_agg WHERE machine = '$m' ORDER BY 1) foo"`
+	ytics=`psql $DBNAME -t -A -c "SELECT string_agg(version, ' ') FROM (SELECT DISTINCT version FROM gcc_total_query_results_agg WHERE machine = '$m' ORDER BY 1) foo"`
+
+	sed 's/DATASET/gcc-load/g' heatmap-gcc.template | sed "s/XTICS_DATA/$xtics/" | sed "s/YTICS_DATA/$ytics/" > gcc-load.plot
+	sed 's/DATASET/gcc-queries-min/g' heatmap-gcc.template | sed "s/XTICS_DATA/$xtics/" | sed "s/YTICS_DATA/$ytics/" > gcc-query-min.plot
+	sed 's/DATASET/gcc-queries-max/g' heatmap-gcc.template | sed "s/XTICS_DATA/$xtics/" | sed "s/YTICS_DATA/$ytics/" > gcc-query-max.plot
+	sed 's/DATASET/gcc-queries-avg/g' heatmap-gcc.template | sed "s/XTICS_DATA/$xtics/" | sed "s/YTICS_DATA/$ytics/" > gcc-query-avg.plot
+
+	gnuplot gcc-load.plot
+	gnuplot gcc-query-min.plot
+	gnuplot gcc-query-max.plot
+	gnuplot gcc-query-avg.plot
+
 	# now clang
-	psql -t -A -F ' ' $DBNAME > clang-load.data <<EOF
+	psql -t -A -F ',' $DBNAME > clang-load.data <<EOF
 SELECT "O0", "O1", "O2", "O3", "Og", "Os", "Oz" FROM crosstab('SELECT
   lpad(version, 10) AS row_name,
   optimization as category,
@@ -96,7 +109,7 @@ EOF
 
 	for jit in on off; do
 
-		psql -t -A -F ' ' $DBNAME > clang-queries-min-$jit.data <<EOF
+		psql -t -A -F ',' $DBNAME > clang-queries-min-$jit.data <<EOF
 	SELECT "O0", "O1", "O2", "O3", "Og", "Os", "Oz" FROM crosstab('SELECT
 	  lpad(version, 10) AS row_name,
 	  optimization as category,
@@ -108,7 +121,7 @@ EOF
 	) AS ct(category text, "O0" text, "O1" text, "O2" text, "O3" text, "Og" text, "Os" text, "Oz" text)
 EOF
 
-		psql -t -A -F ' ' $DBNAME > clang-queries-max-$jit.data <<EOF
+		psql -t -A -F ',' $DBNAME > clang-queries-max-$jit.data <<EOF
 	SELECT "O0", "O1", "O2", "O3", "Og", "Os", "Oz" FROM crosstab('SELECT
 	  lpad(version, 10) AS row_name,
 	  optimization as category,
@@ -120,7 +133,7 @@ EOF
 	) AS ct(category text, "O0" text, "O1" text, "O2" text, "O3" text, "Og" text, "Os" text, "Oz" text)
 EOF
 
-		psql -t -A -F ' ' $DBNAME > clang-queries-avg-$jit.data <<EOF
+		psql -t -A -F ',' $DBNAME > clang-queries-avg-$jit.data <<EOF
 	SELECT "O0", "O1", "O2", "O3", "Og", "Os", "Oz" FROM crosstab('SELECT
 	  lpad(version, 10) AS row_name,
 	  optimization as category,
@@ -134,6 +147,19 @@ EOF
 
 	done
 
-	mv *.data $outdir/
+	xtics=`psql $DBNAME -t -A -c "SELECT string_agg(optimization, ' ') FROM (SELECT DISTINCT optimization FROM clang_total_query_results_agg WHERE machine = '$m' ORDER BY 1) foo"`
+	ytics=`psql $DBNAME -t -A -c "SELECT string_agg(version, ' ') FROM (SELECT DISTINCT version FROM clang_total_query_results_agg WHERE machine = '$m' ORDER BY 1) foo"`
+
+	sed 's/DATASET/clang-load/g' heatmap-clang-load.template | sed "s/XTICS_DATA/$xtics/" | sed "s/YTICS_DATA/$ytics/" > clang-load.plot
+	sed 's/DATASET/clang-queries-min/g' heatmap-clang-queries.template | sed "s/XTICS_DATA/$xtics/" | sed "s/YTICS_DATA/$ytics/" > clang-query-min.plot
+	sed 's/DATASET/clang-queries-max/g' heatmap-clang-queries.template | sed "s/XTICS_DATA/$xtics/" | sed "s/YTICS_DATA/$ytics/" > clang-query-max.plot
+	sed 's/DATASET/clang-queries-avg/g' heatmap-clang-queries.template | sed "s/XTICS_DATA/$xtics/" | sed "s/YTICS_DATA/$ytics/" > clang-query-avg.plot
+
+	gnuplot clang-load.plot
+	gnuplot clang-query-min.plot
+	gnuplot clang-query-max.plot
+	gnuplot clang-query-avg.plot
+
+	mv *.data *.plot *.eps $outdir/
 
 done
