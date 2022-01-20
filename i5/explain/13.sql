@@ -1,24 +1,24 @@
 -- using 1583427054 as a seed to the RNG
 
-
-explain (settings, analyze) select
-	c_count,
-	count(*) as custdist
+EXPLAIN_COMMAND
+select
+    c_count,
+    count(*) as custdist
 from
-	(
-		select
-			c_custkey,
-			count(o_orderkey)
-		from
-			customer left outer join orders on
-				c_custkey = o_custkey
-				and o_comment not like '%special%requests%'
-		group by
-			c_custkey
-	) as c_orders (c_custkey, c_count)
+    (
+        select
+            c_custkey,
+            count(o_orderkey)
+        from
+            customer left outer join orders on
+                c_custkey = o_custkey
+                and o_comment not like '%special%requests%'
+        group by
+            c_custkey
+    ) as c_orders (c_custkey, c_count)
 group by
-	c_count
+    c_count
 order by
-	custdist desc,
-	c_count desc
+    custdist desc,
+    c_count desc
 LIMIT 1;
